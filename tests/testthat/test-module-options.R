@@ -7,7 +7,8 @@ test_that("readModuleDescription returns module metadata", {
 
   expect_equal(desc$name, "jaspSyntaxTestModule")
   expect_equal(desc$title, "Syntax Test Module")
-  expect_equal(desc$version, "0.1.0")
+  # Desktop's Version::asString() drops trailing zeros; .jasp files record it this way
+  expect_equal(desc$version, "0.1")
   expect_length(desc$analyses, 3)
   expect_equal(names(desc$analyses), c("DefaultAnalysis", "MinimalAnalysis", "VariableAnalysis"))
   expect_equal(desc$analyses$DefaultAnalysis$qml, "DefaultAnalysis.qml")
@@ -18,7 +19,8 @@ test_that("readModuleDescription returns module metadata", {
 
 test_that("readModuleDescription handles one-line analysis entries", {
   modulePath <- tempfile("jaspSyntaxInlineModule_")
-  dir.create(file.path(modulePath, "inst"), recursive = TRUE)
+  # Desktop only accepts a module with icons and qml folders
+  for (folder in c("icons", "qml")) dir.create(file.path(modulePath, "inst", folder), recursive = TRUE)
   on.exit(unlink(modulePath, recursive = TRUE), add = TRUE)
   writeLines(
     c(
@@ -57,7 +59,57 @@ test_that("readModuleDescription handles one-line analysis entries", {
   expect_true(desc$analyses$Anova$hasWrapper)
   expect_equal(desc$analyses$CustomAnalysis$qml, "CustomForm.qml")
   expect_true(desc$analyses$CustomAnalysis$preloadData)
-  expect_false(desc$analyses$CustomAnalysis$hasWrapper)
+  # Desktop: an entry has a wrapper when the module or the entry says so
+  expect_true(desc$analyses$CustomAnalysis$hasWrapper)
+})
+
+test_that("readModuleDescription applies Desktop's defaults, not an analysis' properties", {
+  modulePath <- tempfile("jaspSyntaxNestedModule_")
+  # Desktop only accepts a module with icons and qml folders
+  for (folder in c("icons", "qml")) dir.create(file.path(modulePath, "inst", folder), recursive = TRUE)
+  on.exit(unlink(modulePath, recursive = TRUE), add = TRUE)
+  writeLines(
+    c(
+      "Package: jaspSyntaxNestedModule",
+      "Title: Package Title",
+      "Version: 0.1.0",
+      "Description: Package description."
+    ),
+    file.path(modulePath, "DESCRIPTION")
+  )
+  # Like jaspDescriptives: no module-level preloadData, one analysis opts out.
+  writeLines(
+    c(
+      "import QtQuick",
+      "import JASP.Module",
+      "",
+      "Description",
+      "{",
+      "  Analysis",
+      "  {",
+      "    title: qsTr(\"Opt out\")",
+      "    func: \"OptOut\"",
+      "    preloadData: false",
+      "    requiresData: false",
+      "    hasWrapper: true",
+      "  }",
+      "  title: qsTr(\"Module Title { not a brace }\")",
+      "  Analysis { title: qsTr(\"Default\"); func: \"Default\" }",
+      "}"
+    ),
+    file.path(modulePath, "inst", "Description.qml")
+  )
+
+  desc <- jaspSyntax::readModuleDescription(modulePath)
+
+  expect_equal(desc$title, "Module Title { not a brace }")
+  # Desktop derives the module's requiresData from its analyses: only true if all of them require data
+  expect_false(desc$requiresData)
+  expect_false(desc$hasWrappers)
+  expect_false(desc$analyses$OptOut$preloadData)
+  expect_true(desc$analyses$OptOut$hasWrapper)
+  expect_true(desc$analyses$Default$preloadData)
+  expect_false(desc$analyses$Default$hasWrapper)
 })
 
 test_that("parseModuleDescription accepts Description.qml paths", {
