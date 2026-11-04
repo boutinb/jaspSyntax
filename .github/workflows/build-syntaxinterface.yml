@@ -15,9 +15,14 @@ on:
         required: false
         default: 'development'
       release_tag:
-        description: 'Release tag to upload assets to'
+        description: 'Release tag to upload assets to (empty = the most recently created release)'
         required: false
-        default: 'syntaxinterface-libs'
+        default: ''
+      update_configure:
+        description: 'Set this release tag as the default in configure and configure.win, and commit that to the branch the workflow runs on'
+        required: false
+        type: boolean
+        default: false
       os_filter:
         description: 'Limit the build to one runner, or build all of them. A full build also refreshes SHA256SUMS and the release notes.'
         required: false
@@ -42,7 +47,8 @@ concurrency:
 env:
   JASP_DESKTOP_REPO: ${{ github.repository_owner }}/jasp-desktop
   JASP_DESKTOP_REF: ${{ github.event.inputs.jasp_desktop_ref || 'development' }}
-  RELEASE_TAG: ${{ github.event.inputs.release_tag || 'syntaxinterface-libs' }}
+  # Resolved in the setup job: an empty release_tag input means the most recently created release.
+  RELEASE_TAG_INPUT: ${{ github.event.inputs.release_tag }}
   QT_VERSION: '6.10.2'
   QT_SUBMODULES: 'qtbase,qtdeclarative,qtshadertools'
   QT_SUBMODULES_CACHE_KEY: 'qtbase-qtdeclarative-qtshadertools'
@@ -65,9 +71,31 @@ jobs:
   setup:
     runs-on: ubuntu-latest
     outputs:
-      matrix:     ${{ steps.set-matrix.outputs.matrix }}
-      full_build: ${{ steps.set-matrix.outputs.full_build }}
+      matrix:      ${{ steps.set-matrix.outputs.matrix }}
+      full_build:  ${{ steps.set-matrix.outputs.full_build }}
+      release_tag: ${{ steps.release-tag.outputs.release_tag }}
     steps:
+      - id: release-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="$RELEASE_TAG_INPUT"
+          if [ -z "$TAG" ]; then
+            # gh lists releases newest first (by creation date).
+            TAG=$(gh release list -R "${{ github.repository }}" --exclude-drafts --limit 1 --json tagName -q '.[0].tagName')
+            if [ -z "$TAG" ]; then
+              echo "::error::No release_tag given and ${{ github.repository }} has no releases to default to."
+              exit 1
+            fi
+            echo "No release_tag given, using the latest release: $TAG"
+          fi
+          # The tag ends up in a sed replacement and a commit message.
+          if ! [[ "$TAG" =~ ^[A-Za-z0-9._-]+$ ]]; then
+            echo "::error::release_tag '$TAG' may only contain letters, digits, '.', '_' and '-'."
+            exit 1
+          fi
+          echo "release_tag=$TAG" >> "$GITHUB_OUTPUT"
+
       - id: set-matrix
         # when updating windows-2022 to windows-latest (2026 as of writing) make sure to update VCVARSALL above
         # The Linux runners are pinned to 24.04, not ubuntu-latest (now 26.04): building against the older glibc
@@ -424,6 +452,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+    env:
+      RELEASE_TAG: ${{ needs.setup.outputs.release_tag }}
 
     steps:
       - name: Download all artifacts
@@ -489,3 +519,51 @@ jobs:
           draft: false
           prerelease: false
           make_latest: false
+
+      # ---- Make the new tag the default that configure / configure.win download from ----
+
+      - name: Checkout jaspSyntax (to update configure)
+        if: github.event.inputs.update_configure == 'true'
+        uses: actions/checkout@v6
+        with:
+          path: jaspSyntax
+          fetch-depth: 0   # full history, so the rebase below finds a merge base
+
+      - name: Set release tag in configure and configure.win
+        if: github.event.inputs.update_configure == 'true'
+        working-directory: jaspSyntax
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # configure fails without these, so never point it at a release that lacks them
+          # (a single-OS build to a new tag only uploads one library).
+          ASSETS=$(gh release view "$RELEASE_TAG" -R "${{ github.repository }}" --json assets -q '.assets[].name')
+          for asset in SHA256SUMS SyntaxInterface-sources.tar.gz \
+                       libSyntaxInterface-linux-x86_64.so libSyntaxInterface-linux-arm64.so \
+                       libSyntaxInterface-darwin-x86_64.dylib libSyntaxInterface-darwin-arm64.dylib \
+                       SyntaxInterface-windows-x86_64.dll libR-InterfaceNoRInside-windows-x86_64.dll; do
+            if ! grep -qxF "$asset" <<< "$ASSETS"; then
+              echo "::error::Release $RELEASE_TAG has no $asset; not making it the default in configure. Run a full build (os_filter: all) first."
+              exit 1
+            fi
+          done
+
+          for f in configure configure.win; do
+            sed -i -E 's/^(GITHUB_RELEASE_TAG="\$\{JASPSYNTAX_RELEASE_TAG:-)[^}]*(\}")$/\1'"$RELEASE_TAG"'\2/' "$f"
+            if ! grep -qxF "GITHUB_RELEASE_TAG=\"\${JASPSYNTAX_RELEASE_TAG:-$RELEASE_TAG}\"" "$f"; then
+              echo "::error::Could not find the GITHUB_RELEASE_TAG line in $f."
+              exit 1
+            fi
+          done
+
+          if git diff --quiet -- configure configure.win; then
+            echo "configure and configure.win already default to $RELEASE_TAG."
+            exit 0
+          fi
+          git diff -- configure configure.win
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update GitHub release tag to $RELEASE_TAG" -- configure configure.win
+          # The build takes hours; the branch may have moved on in the meantime.
+          git pull --rebase origin "${{ github.ref_name }}"
+          git push origin "HEAD:${{ github.ref_name }}"
