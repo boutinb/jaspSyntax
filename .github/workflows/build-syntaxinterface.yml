@@ -498,7 +498,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
-          name: "SyntaxInterface pre-built libraries"
+          name: "Release ${{ env.RELEASE_TAG }}"
           body_path: release-body.md
           files: libs/*
           draft: false
@@ -506,12 +506,14 @@ jobs:
           make_latest: false
 
       # Single-OS build: upload only the library file; leave release notes and
-      # the full SHA256SUMS from the last complete build untouched.
+      # the full SHA256SUMS from the last complete build untouched. The name is
+      # set here too, so a release this step creates is named like a full one.
       - name: Upload library to release (single OS)
         if: needs.setup.outputs.full_build != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ env.RELEASE_TAG }}
+          name: "Release ${{ env.RELEASE_TAG }}"
           files: |
             libs/*.so
             libs/*.dylib
