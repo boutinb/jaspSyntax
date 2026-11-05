@@ -29,14 +29,18 @@ class DataFrameImporter
 
 public:
 	static const SyntaxBridgeDataSet& loadDataFrame(const Rcpp::List& dataframe, const std::string& name = std::string());
+	///< The levels of the factor columns of the last loaded data frame, one entry per column (levelCount 0: not a factor)
+	static const SyntaxBridgeColumnLevels* columnLevels() { return levelsStatic; }
 	static Rcpp::List getVariableNames();
 	static Rcpp::List getVariableValues(Rcpp::String variableName);
 
 private:
 	static SyntaxBridgeDataSet datasetStatic;
+	static SyntaxBridgeColumnLevels* levelsStatic;
 	static void freeDataSet();
 
 	static std::vector<std::string> readFactorVector(Rcpp::IntegerVector obj);
+	static void readFactorLevels(Rcpp::IntegerVector obj, SyntaxBridgeColumnLevels& columnLevels);
 
 	template<int RTYPE>
 	static std::vector<std::string> readCharacterVector(Rcpp::Vector<RTYPE>	obj);

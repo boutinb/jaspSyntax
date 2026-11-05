@@ -22,6 +22,7 @@
 #include <sstream>
 
 SyntaxBridgeDataSet DataFrameImporter::datasetStatic;
+SyntaxBridgeColumnLevels* DataFrameImporter::levelsStatic = nullptr;
 
 std::string doubleToString(double dbl)
 {
@@ -90,8 +91,32 @@ std::vector<std::string> DataFrameImporter::readFactorVector(Rcpp::IntegerVector
 	return result;
 }
 
+void DataFrameImporter::readFactorLevels(Rcpp::IntegerVector obj, SyntaxBridgeColumnLevels& columnLevels)
+{
+	//The bridge orders the labels of the column by these levels, so that a factor keeps its level order
+	Rcpp::CharacterVector levels = obj.attr("levels");
+
+	columnLevels.levels		= static_cast<char**>(calloc(levels.size(), sizeof(char*)));
+	columnLevels.levelCount	= 0;
+
+	for (int levelNr = 0; levelNr < levels.size(); levelNr++)
+		if (levels[levelNr] != NA_STRING)
+			columnLevels.levels[columnLevels.levelCount++] = strdup(Rcpp::as<std::string>(levels[levelNr]).c_str());
+}
+
 void DataFrameImporter::freeDataSet()
 {
+	if (levelsStatic)
+		for (int colNr = 0; colNr < datasetStatic.columnCount; colNr++)
+		{
+			for (int levelNr = 0; levelNr < levelsStatic[colNr].levelCount; levelNr++)
+				free(levelsStatic[colNr].levels[levelNr]);
+			free(levelsStatic[colNr].levels);
+		}
+
+	free(levelsStatic);
+	levelsStatic = nullptr;
+
 	for (int colNr = 0; colNr < datasetStatic.columnCount; colNr++)
 	{
 		SyntaxBridgeColumn& column = datasetStatic.columns[colNr];
@@ -126,6 +151,7 @@ const SyntaxBridgeDataSet& DataFrameImporter::loadDataFrame(const Rcpp::List& da
 
 	datasetStatic.columnCount = dataframe.size();
 	datasetStatic.columns = static_cast<SyntaxBridgeColumn*>(calloc(dataframe.size(), sizeof(SyntaxBridgeColumn)));
+	levelsStatic = static_cast<SyntaxBridgeColumnLevels*>(calloc(dataframe.size(), sizeof(SyntaxBridgeColumnLevels)));
 
 	int maxRows = 0;
 	std::vector<std::vector<std::string>> allColumns;
@@ -144,7 +170,11 @@ const SyntaxBridgeDataSet& DataFrameImporter::loadDataFrame(const Rcpp::List& da
 
 		Rcpp::RObject colObj = (Rcpp::RObject)dataframe[colNr];
 
-		if(Rf_inherits(colObj, "factor"))					colValues = readFactorVector((Rcpp::IntegerVector)colObj);
+		if(Rf_inherits(colObj, "factor"))
+		{
+			colValues = readFactorVector((Rcpp::IntegerVector)colObj);
+			readFactorLevels((Rcpp::IntegerVector)colObj, levelsStatic[colNr]);
+		}
 		else if(Rcpp::is<Rcpp::NumericVector>(colObj))		colValues = readCharacterVector<REALSXP>((Rcpp::NumericVector)colObj);
 		else if(Rcpp::is<Rcpp::IntegerVector>(colObj))		colValues = readCharacterVector<INTSXP>((Rcpp::IntegerVector)colObj);
 		else if(Rcpp::is<Rcpp::LogicalVector>(colObj))		colValues = readCharacterVector<LGLSXP>((Rcpp::LogicalVector)colObj);

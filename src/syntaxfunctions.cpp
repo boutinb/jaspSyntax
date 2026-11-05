@@ -193,8 +193,8 @@ int loadDataSet(Rcpp::List data)
 	//Returns the REAL database id the bridge assigned. Informational: dataset selection
 	//options take the dataset title ("haha", or "haha - myfilter" for a saved named filter
 	//of a live JASP session), never this id (ids stay internal wire format).
-	const int dataSetId = callBridgeOrStop("syntaxBridgeLoadDataSet", [&]() {
-		return syntaxBridgeLoadDataSet(&dataset, global_param_dbInMemory, global_param_threshold, global_param_orderLabelsByValue);
+	const int dataSetId = callBridgeOrStop("syntaxBridgeLoadDataSetWithLevels", [&]() {
+		return syntaxBridgeLoadDataSetWithLevels(&dataset, DataFrameImporter::columnLevels(), global_param_dbInMemory, global_param_threshold, global_param_orderLabelsByValue);
 	});
 
 	//init() failure returns -1 with the message only in JASP's log: say so HERE too, the
@@ -261,8 +261,8 @@ Rcpp::IntegerVector loadDataSets(Rcpp::List datasets)
 		const SyntaxBridgeDataSet& dataset = DataFrameImporter::loadDataFrame(
 				Rcpp::as<Rcpp::List>(datasets[i]), name);
 
-		const int dataSetId = callBridgeOrStop("syntaxBridgeLoadDataSet", [&]() {
-			return syntaxBridgeLoadDataSet(&dataset, global_param_dbInMemory, global_param_threshold, global_param_orderLabelsByValue);
+		const int dataSetId = callBridgeOrStop("syntaxBridgeLoadDataSetWithLevels", [&]() {
+			return syntaxBridgeLoadDataSetWithLevels(&dataset, DataFrameImporter::columnLevels(), global_param_dbInMemory, global_param_threshold, global_param_orderLabelsByValue);
 		});
 
 		if (dataSetId < 0)
