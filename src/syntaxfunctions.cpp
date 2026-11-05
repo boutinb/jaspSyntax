@@ -464,24 +464,25 @@ SEXP transformJsonValueToSEXP(const Json::Value & json)
 	return R_NilValue;
 }
 
-// [[Rcpp::export]]
-Rcpp::List analysisOptionsFromJaspFile(String jaspFilePath, int analysisNr)
+template <typename BridgeFunction>
+Rcpp::List analysisOptionsFromJaspFileThrough(const char * bridgeName, BridgeFunction bridgeFunction, String jaspFilePath, int analysisNr)
 {
 	std::string jaspFilePathStr = jaspFilePath.get_cstring();
 
 	Json::Value status = parseBridgeJsonOrStop(
-		callBridgeOrStop("syntaxBridgeAnalysisOptionsFromJaspFileStatus", [&]() {
-			return syntaxBridgeAnalysisOptionsFromJaspFileStatus(jaspFilePathStr.c_str(), analysisNr);
+		callBridgeOrStop(bridgeName, [&]() {
+			return bridgeFunction(jaspFilePathStr.c_str(), analysisNr);
 		}),
-		"syntaxBridgeAnalysisOptionsFromJaspFileStatus"
+		bridgeName
 	);
 	if (!status.isObject())
-		Rcpp::stop("syntaxBridgeAnalysisOptionsFromJaspFileStatus returned a non-object status.");
+		Rcpp::stop("%s returned a non-object status.", bridgeName);
 	if (!status["ok"].asBool())
 	{
 		std::string error = status.isMember("error") ? status["error"].asString() : "unknown error";
 		Rcpp::stop(
-			"syntaxBridgeAnalysisOptionsFromJaspFile failed for analysis %d in file %s: %s",
+			"%s failed for analysis %d in file %s: %s",
+			bridgeName,
 			analysisNr,
 			jaspFilePathStr.c_str(),
 			error
@@ -491,13 +492,32 @@ Rcpp::List analysisOptionsFromJaspFile(String jaspFilePath, int analysisNr)
 	const Json::Value & parsedOptions = status["options"];
 	if (!parsedOptions.isObject())
 		Rcpp::stop(
-			"syntaxBridgeAnalysisOptionsFromJaspFileStatus returned %s instead of a JSON object for analysis %d in file: %s",
+			"%s returned %s instead of a JSON object for analysis %d in file: %s",
+			bridgeName,
 			parsedOptions.isNull() ? "null" : "a non-object value",
 			analysisNr,
 			jaspFilePathStr.c_str()
 		);
 
 	return transformJsonObjectToRcppList(parsedOptions);
+}
+
+// [[Rcpp::export]]
+Rcpp::List analysisOptionsFromJaspFile(String jaspFilePath, int analysisNr)
+{
+	return analysisOptionsFromJaspFileThrough("syntaxBridgeAnalysisOptionsFromJaspFileStatus",
+		[](const char * filePath, int nr) { return syntaxBridgeAnalysisOptionsFromJaspFileStatus(filePath, nr); },
+		jaspFilePath, analysisNr);
+}
+
+// The saved options with their {value, types} term options split into <name> and <name>.types by JASP
+// Desktop's own walk (ColumnEncoder::flattenTypesInOptions), as an analysis that does not preload its data gets them.
+// [[Rcpp::export]]
+Rcpp::List flattenedAnalysisOptionsFromJaspFile(String jaspFilePath, int analysisNr)
+{
+	return analysisOptionsFromJaspFileThrough("syntaxBridgeFlattenedAnalysisOptionsFromJaspFileStatus",
+		[](const char * filePath, int nr) { return syntaxBridgeFlattenedAnalysisOptionsFromJaspFileStatus(filePath, nr); },
+		jaspFilePath, analysisNr);
 }
 
 // [[Rcpp::export]]
