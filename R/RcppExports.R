@@ -91,6 +91,10 @@ analysisOptionsFromJaspFile <- function(jaspFilePath, analysisNr) {
     .Call(`_jaspSyntax_analysisOptionsFromJaspFile`, jaspFilePath, analysisNr)
 }
 
+flattenedAnalysisOptionsFromJaspFile <- function(jaspFilePath, analysisNr) {
+    .Call(`_jaspSyntax_flattenedAnalysisOptionsFromJaspFile`, jaspFilePath, analysisNr)
+}
+
 generateAnalysisWrapper <- function(modulePath, analysisName) {
     .Call(`_jaspSyntax_generateAnalysisWrapper`, modulePath, analysisName)
 }

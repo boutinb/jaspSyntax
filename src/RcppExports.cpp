@@ -165,6 +165,18 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// flattenedAnalysisOptionsFromJaspFile
+Rcpp::List flattenedAnalysisOptionsFromJaspFile(String jaspFilePath, int analysisNr);
+RcppExport SEXP _jaspSyntax_flattenedAnalysisOptionsFromJaspFile(SEXP jaspFilePathSEXP, SEXP analysisNrSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< String >::type jaspFilePath(jaspFilePathSEXP);
+    Rcpp::traits::input_parameter< int >::type analysisNr(analysisNrSEXP);
+    rcpp_result_gen = Rcpp::wrap(flattenedAnalysisOptionsFromJaspFile(jaspFilePath, analysisNr));
+    return rcpp_result_gen;
+END_RCPP
+}
 // generateAnalysisWrapper
 String generateAnalysisWrapper(String modulePath, String analysisName);
 RcppExport SEXP _jaspSyntax_generateAnalysisWrapper(SEXP modulePathSEXP, SEXP analysisNameSEXP) {
@@ -236,6 +248,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_jaspSyntax_parseDescription", (DL_FUNC) &_jaspSyntax_parseDescription, 1},
     {"_jaspSyntax_loadDataSetFromJaspFile", (DL_FUNC) &_jaspSyntax_loadDataSetFromJaspFile, 1},
     {"_jaspSyntax_analysisOptionsFromJaspFile", (DL_FUNC) &_jaspSyntax_analysisOptionsFromJaspFile, 2},
+    {"_jaspSyntax_flattenedAnalysisOptionsFromJaspFile", (DL_FUNC) &_jaspSyntax_flattenedAnalysisOptionsFromJaspFile, 2},
     {"_jaspSyntax_generateAnalysisWrapper", (DL_FUNC) &_jaspSyntax_generateAnalysisWrapper, 2},
     {"_jaspSyntax_getVariableNames", (DL_FUNC) &_jaspSyntax_getVariableNames, 0},
     {"_jaspSyntax_columnEncoderContextNative", (DL_FUNC) &_jaspSyntax_columnEncoderContextNative, 0},

@@ -206,56 +206,12 @@
     options[["types"]] <- NULL
     optionNames <- names(options)
   }
+  # the <name>.types the option encoder writes next to a nested option (e.g. in the rows of a list)
+  if (!is.null(optionNames) && any(grepl("\\.types$", optionNames))) {
+    options <- options[!grepl("\\.types$", optionNames)]
+  }
 
   options[] <- lapply(options, .dropNestedTypeOptions)
-
-  options
-}
-
-.isTypedOptionValue <- function(x) {
-  is.list(x) && !is.null(names(x)) && all(c("value", "types") %in% names(x))
-}
-
-# The saved `{value, types}` shape of a variables option split into `<name>` and `<name>.types`,
-# as JASP Desktop does for an analysis that does not preload its data
-# (`ColumnEncoder::_handleTermOptionObject`, the non-preloadData branch, reached through
-# `_addTypeToColumnNamesInOptionsRecursively`): `<name>.types` gets the saved types, and `<name>`
-# the saved value, unless the option has an `optionKey` and members besides
-# `optionKey`/`types`/`value`, in which case the option is kept as it is. The value itself is not
-# walked again. Column names are left as they are (no type suffix, no encoding).
-.flattenTypedOptions <- function(options, includeTypeOptions = TRUE) {
-  if (!is.list(options)) {
-    return(options)
-  }
-
-  optionNames <- names(options)
-  if (is.null(optionNames)) {
-    options[] <- lapply(options, .flattenTypedOptions, includeTypeOptions = includeTypeOptions)
-    return(options)
-  }
-
-  for (optionName in optionNames) {
-    if (identical(optionName, ".filterIds")) {
-      next
-    }
-
-    option <- options[[optionName]]
-    if (!.isTypedOptionValue(option)) {
-      options[optionName] <- list(.flattenTypedOptions(option, includeTypeOptions))
-      next
-    }
-
-    if (includeTypeOptions) {
-      options[paste0(optionName, ".types")] <- list(option[["types"]])
-    }
-
-    optionKey <- option[["optionKey"]]
-    keepOriginalOption <- is.character(optionKey) && length(optionKey) == 1L &&
-      nzchar(optionKey) && length(option) > 3L
-    if (!keepOriginalOption) {
-      options[optionName] <- list(option[["value"]])
-    }
-  }
 
   options
 }
@@ -753,7 +709,11 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
 
   records <- vector("list", length(analyses))
   for (i in seq_along(analyses)) {
-    options <- analysisOptionsFromJaspFile(jaspFilePath, i - 1L)
+    options <- if (flattenTypes) {
+      flattenedAnalysisOptionsFromJaspFile(jaspFilePath, i - 1L)
+    } else {
+      analysisOptionsFromJaspFile(jaspFilePath, i - 1L)
+    }
     options <- .filterOptionMetadata(options, includeMeta = TRUE, includeTypeOptions = TRUE)
     records[[i]] <- .analysisRecordFromJaspFile(analyses[[i]], options)
 
@@ -765,9 +725,6 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
         includeTypeOptions = includeTypeOptions
       )
     } else {
-      if (flattenTypes) {
-        records[[i]]$options <- .flattenTypedOptions(records[[i]]$options, includeTypeOptions)
-      }
       records[[i]]$options <- .filterOptionMetadata(
         records[[i]]$options,
         includeMeta = includeMeta,
@@ -890,10 +847,11 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
 #' @param flattenTypes Whether to split the saved `{value, types}` shape of
 #'   variables options into `<name>` (the value) and `<name>.types` (the
 #'   types), as JASP Desktop does before it calls an analysis that does not
-#'   preload its data. Column names stay plain (not encoded, no type suffix).
-#'   An option with an `optionKey` and other members besides
-#'   `optionKey`/`types`/`value` keeps its saved shape, also as in JASP
-#'   Desktop. Only for `runtime = FALSE`.
+#'   preload its data: this runs Desktop's own walk
+#'   (`ColumnEncoder::flattenTypesInOptions`). Column names stay plain (not
+#'   encoded, no type suffix). An option with an `optionKey` and other members
+#'   besides `optionKey`/`types`/`value` keeps its saved shape, a nested option
+#'   gets its `.types` next to it. Only for `runtime = FALSE`.
 #' @param isolated Whether to run the native `.jasp` option extraction in a
 #'   separate R process. This is the default because the SyntaxInterface bridge
 #'   owns process-global native state. In-process reads also clear native state

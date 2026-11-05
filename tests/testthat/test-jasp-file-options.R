@@ -164,40 +164,31 @@ test_that("includeTypeOptions false removes nested saved-bound type metadata", {
   expect_false("variables.types" %in% names(records[[1]]$options))
 })
 
-test_that("flattenTypes splits saved value/types options like JASP Desktop", {
+test_that("flattenTypes splits saved value/types options with JASP Desktop's own walk", {
   jaspFile <- tempfile(fileext = ".jasp")
-  writeTestJaspFile(jaspFile, list(list(name = "FlatAnalysis", title = "Flat Analysis")))
-
-  restoreBinding <- localNamespaceBinding(
-    "analysisOptionsFromJaspFile",
-    function(jaspFilePath, analysisNr) {
-      list(
-        `.meta` = list(variables = list(shouldEncode = TRUE)),
-        variables = list(types = list("scale", "nominal"), value = list("x", "y")),
-        split = list(types = list(), value = ""),
-        modelTerms = list(
-          optionKey = "components",
-          types = list("scale", "nominal"),
-          value = list(list(components = list("x")), list(components = list("y")))
-        ),
-        factors = list(
-          optionKey = "levels",
-          types = list("nominal"),
-          value = list(list(levels = list("a"))),
-          title = "Factors"
-        ),
-        rows = list(
-          list(name = "first", coefficientAlpha = list(types = list(), value = "")),
-          list(name = "second", coefficientAlpha = list(types = list("scale"), value = "x"))
-        ),
-        nested = list(splitBy = list(types = list("nominal"), value = "group")),
-        `.filterIds` = list(variables = list(types = 1L, value = 2L)),
-        checked = TRUE
-      )
-    },
-    asNamespace("jaspSyntax")
+  savedOptions <- list(
+    `.meta` = list(variables = list(shouldEncode = TRUE)),
+    variables = list(types = list("scale", "nominal"), value = list("x", "y")),
+    split = list(types = list(), value = ""),
+    modelTerms = list(
+      optionKey = "components",
+      types = list("scale", "nominal"),
+      value = list(list(components = list("x")), list(components = list("y")))
+    ),
+    factors = list(
+      optionKey = "levels",
+      types = list("nominal"),
+      value = list(list(levels = list("a"))),
+      title = "Factors"
+    ),
+    rows = list(
+      list(name = "first", coefficientAlpha = list(types = list(), value = "")),
+      list(name = "second", coefficientAlpha = list(types = list("scale"), value = "x"))
+    ),
+    nested = list(splitBy = list(types = list("nominal"), value = "group")),
+    checked = TRUE
   )
-  on.exit(restoreBinding(), add = TRUE)
+  writeTestJaspFile(jaspFile, list(list(name = "FlatAnalysis", title = "Flat Analysis", options = savedOptions)))
 
   opts <- jaspSyntax::readAnalysisOptionsFromJaspFile(
     jaspFile, flattenTypes = TRUE, isolated = FALSE
@@ -227,9 +218,6 @@ test_that("flattenTypes splits saved value/types options like JASP Desktop", {
   expect_equal(opts$nested$splitBy, "group")
   expect_equal(opts$nested$`splitBy.types`, list("nominal"))
 
-  # the provenance sidecar and plain options are left alone
-  expect_equal(opts$`.filterIds`, list(variables = list(types = 1L, value = 2L)))
-  expect_false(".filterIds.types" %in% names(opts))
   expect_true(opts$checked)
   expect_equal(opts$`.meta`, list(variables = list(shouldEncode = TRUE)))
   expect_equal(attr(opts, "analysisName"), "FlatAnalysis")
@@ -241,6 +229,7 @@ test_that("flattenTypes splits saved value/types options like JASP Desktop", {
   expect_equal(withoutTypes$variables, list("x", "y"))
   expect_false(any(grepl("\\.types$", names(withoutTypes))))
   expect_false("coefficientAlpha.types" %in% names(withoutTypes$rows[[2]]))
+  expect_false("splitBy.types" %in% names(withoutTypes$nested))
   expect_false("types" %in% names(withoutTypes$factors))
   expect_false(".meta" %in% names(withoutTypes))
 
