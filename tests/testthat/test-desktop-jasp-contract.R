@@ -63,6 +63,23 @@ test_that("readDatasetFromJaspFile reads a real Desktop .jasp dataset", {
   expect_equal(as.integer(dataset$ID[1:5]), 1:5)
 })
 
+test_that(".jasp files can be given with a ~ path", {
+  jaspFile <- normalizePath(desktopJaspFixture(), winslash = "/", mustWork = FALSE)
+  testthat::skip_if_not(file.exists(jaspFile), "Desktop .jasp fixture missing")
+
+  home <- normalizePath(path.expand("~"), winslash = "/", mustWork = FALSE)
+  testthat::skip_if_not(startsWith(jaspFile, paste0(home, "/")), "Desktop .jasp fixture is not inside the home directory")
+  tildeFile <- paste0("~", substring(jaspFile, nchar(home) + 1L))
+
+  dataset <- jaspSyntax::readDatasetFromJaspFile(tildeFile)
+  expect_equal(dim(dataset), c(20L, 3L))
+
+  # the native entry point itself expands the path too
+  on.exit(jaspSyntax::clearNativeState(), add = TRUE)
+  jaspSyntax::loadDataSetFromJaspFile(tildeFile)
+  expect_equal(dim(jaspSyntax::readLoadedDataset()), c(20L, 3L))
+})
+
 test_that("readAnalysisOptionsFromJaspFile returns saved bound Desktop options", {
   jaspFile <- desktopJaspFixture()
   testthat::skip_if_not(file.exists(jaspFile), "Desktop .jasp fixture missing")

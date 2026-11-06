@@ -139,7 +139,7 @@
 
       if (.Platform$OS.type == "windows" && length(dllDirs) > 0L) {
         currentPathEntries <- pathEntries()
-        buildDir <- Sys.getenv("JASP_BUILD_DIR")
+        buildDir <- path.expand(Sys.getenv("JASP_BUILD_DIR"))
         buildDirs <- if (nzchar(buildDir)) {
           c(file.path(buildDir, "R-Interface"), buildDir)
         } else {

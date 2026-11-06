@@ -590,13 +590,27 @@ else
 	echo "No R_HOME found!"
 fi
 
+# A path in configure.vars is quoted (JASP_SOURCE_DIR='~/...'), so the shell does not expand its ~
+expandTilde() {
+	if [ -z "${HOME:-}" ]; then
+		printf '%s' "$1"
+		return
+	fi
+
+	case "$1" in
+		"~")	printf '%s' "${HOME}" ;;
+		"~/"*)	printf '%s/%s' "${HOME}" "${1#"~/"}" ;;
+		*)		printf '%s' "$1" ;;
+	esac
+}
+
 PKG_CXXFLAGS=""
-JASP_SOURCE_DIR="${JASP_SOURCE_DIR:-}"
-JASP_BUILD_DIR="${JASP_BUILD_DIR:-}"
+JASP_SOURCE_DIR="$(expandTilde "${JASP_SOURCE_DIR:-}")"
+JASP_BUILD_DIR="$(expandTilde "${JASP_BUILD_DIR:-}")"
 # JASPSYNTAX_LIB_DIR: directory containing pre-built SyntaxInterface.dll (and optionally libR-InterfaceNoRInside.dll)
-JASPSYNTAX_LIB_DIR="${JASPSYNTAX_LIB_DIR:-}"
-JASPSYNTAX_RUNTIME_DIR="${JASPSYNTAX_RUNTIME_DIR:-}"
-JASPSYNTAX_QT_DIR="${JASPSYNTAX_QT_DIR:-}"
+JASPSYNTAX_LIB_DIR="$(expandTilde "${JASPSYNTAX_LIB_DIR:-}")"
+JASPSYNTAX_RUNTIME_DIR="$(expandTilde "${JASPSYNTAX_RUNTIME_DIR:-}")"
+JASPSYNTAX_QT_DIR="$(expandTilde "${JASPSYNTAX_QT_DIR:-}")"
 
 if [ -z "${JASP_SOURCE_DIR}" ] && [ -n "${JASP_BUILD_DIR}" ]; then
 	JASP_BUILD_PARENT="$(cd "${JASP_BUILD_DIR}/.." 2>/dev/null && pwd)"

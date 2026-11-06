@@ -26,6 +26,13 @@ using namespace Rcpp;
 #include "syntaxbridge_interface.h"
 #include "json/json.h"
 
+// R users write paths like "~/data.jasp" (path.expand): the native library takes a path as it is, so
+// expand it here, the way R itself does, for every argument that is a path.
+static std::string expandedPath(const String & path)
+{
+	return R_ExpandFileName(path.get_cstring());
+}
+
 static bool		global_param_dbInMemory				= false;
 static bool		global_param_orderLabelsByValue		= true;
 static int		global_param_threshold				= 10;
@@ -279,7 +286,7 @@ Rcpp::IntegerVector loadDataSets(Rcpp::List datasets)
 // [[Rcpp::export]]
 String loadQmlAndParseOptions(String moduleName, String analysisName, String qmlFile, String options, String version, bool preloadData)
 {
-	std::string qmlFileStr		= qmlFile.get_cstring(),
+	std::string qmlFileStr		= expandedPath(qmlFile),
 				optionsStr		= options.get_cstring(),
 				versionStr		= version.get_cstring(),
 				analysisNameStr	= analysisName.get_cstring(),
@@ -315,7 +322,7 @@ String loadQmlAndParseOptions(String moduleName, String analysisName, String qml
 // [[Rcpp::export]]
 List loadQmlAndParseOptionsStatus(String moduleName, String analysisName, String qmlFile, String options, String version, bool preloadData)
 {
-	std::string qmlFileStr		= qmlFile.get_cstring(),
+	std::string qmlFileStr		= expandedPath(qmlFile),
 				optionsStr		= options.get_cstring(),
 				versionStr		= version.get_cstring(),
 				analysisNameStr	= analysisName.get_cstring(),
@@ -343,7 +350,7 @@ List loadQmlAndParseOptionsStatus(String moduleName, String analysisName, String
 // [[Rcpp::export]]
 String generateModuleWrappers(String modulePath)
 {
-	std::string modulePathStr = modulePath.get_cstring();
+	std::string modulePathStr = expandedPath(modulePath);
 
 	return callBridgeOrStop("syntaxBridgeGenerateModuleWrappers", [&]() {
 		return syntaxBridgeGenerateModuleWrappers(modulePathStr.c_str());
@@ -353,7 +360,7 @@ String generateModuleWrappers(String modulePath)
 // [[Rcpp::export]]
 Rcpp::List parseDescription(String modulePath)
 {
-	std::string modulePathStr = modulePath.get_cstring();
+	std::string modulePathStr = expandedPath(modulePath);
 
 	Json::Value parsedDescription = parseBridgeJsonOrStop(
 		callBridgeOrStop("syntaxBridgeParseDescription", [&]() {
@@ -400,7 +407,7 @@ Rcpp::List parseDescription(String modulePath)
 // [[Rcpp::export]]
 void loadDataSetFromJaspFile(String jaspFilePath)
 {
-	std::string jaspFilePathStr = jaspFilePath.get_cstring();
+	std::string jaspFilePathStr = expandedPath(jaspFilePath);
 
 	Json::Value status = parseBridgeJsonOrStop(
 		callBridgeOrStop("syntaxBridgeLoadDataSetFromJaspFileStatus", [&]() {
@@ -467,7 +474,7 @@ SEXP transformJsonValueToSEXP(const Json::Value & json)
 template <typename BridgeFunction>
 Rcpp::List analysisOptionsFromJaspFileThrough(const char * bridgeName, BridgeFunction bridgeFunction, String jaspFilePath, int analysisNr)
 {
-	std::string jaspFilePathStr = jaspFilePath.get_cstring();
+	std::string jaspFilePathStr = expandedPath(jaspFilePath);
 
 	Json::Value status = parseBridgeJsonOrStop(
 		callBridgeOrStop(bridgeName, [&]() {
@@ -523,7 +530,7 @@ Rcpp::List flattenedAnalysisOptionsFromJaspFile(String jaspFilePath, int analysi
 // [[Rcpp::export]]
 String generateAnalysisWrapper(String modulePath, String analysisName)
 {
-	std::string modulePathStr	= modulePath.get_cstring(),
+	std::string modulePathStr	= expandedPath(modulePath),
 				analysisNameStr	= analysisName.get_cstring();
 
 	return callBridgeOrStop("syntaxBridgeGenerateAnalysisWrapper", [&]() {

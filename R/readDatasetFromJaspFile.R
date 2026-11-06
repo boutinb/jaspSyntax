@@ -3,6 +3,9 @@
     stop("`jaspFilePath` must be a single string")
   }
 
+  # file.exists() expands a "~/..." path, the native library does not
+  jaspFilePath <- path.expand(jaspFilePath)
+
   if (!file.exists(jaspFilePath)) {
     stop("File not found: ", jaspFilePath)
   }
