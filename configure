@@ -135,13 +135,27 @@ else
 	echo "No R_HOME found!"
 fi
 
+# A path in configure.vars is quoted (JASP_SOURCE_DIR='~/...'), so the shell does not expand its ~
+expandTilde() {
+	if [ -z "${HOME:-}" ]; then
+		printf '%s' "$1"
+		return
+	fi
+
+	case "$1" in
+		"~")	printf '%s' "${HOME}" ;;
+		"~/"*)	printf '%s/%s' "${HOME}" "${1#"~/"}" ;;
+		*)		printf '%s' "$1" ;;
+	esac
+}
+
 PKG_CXXFLAGS=""
-JASP_SOURCE_DIR="${JASP_SOURCE_DIR:-}"
-JASP_BUILD_DIR="${JASP_BUILD_DIR:-}"
+JASP_SOURCE_DIR="$(expandTilde "${JASP_SOURCE_DIR:-}")"
+JASP_BUILD_DIR="$(expandTilde "${JASP_BUILD_DIR:-}")"
 
 # JASPSYNTAX_LIB_PATH: direct path to a pre-built libSyntaxInterface (.so/.dylib)
 # Overrides both JASP_BUILD_DIR and the GitHub Release download.
-JASPSYNTAX_LIB_PATH="${JASPSYNTAX_LIB_PATH:-}"
+JASPSYNTAX_LIB_PATH="$(expandTilde "${JASPSYNTAX_LIB_PATH:-}")"
 
 if [ -z "${JASP_SOURCE_DIR}" ] && [ -n "${JASP_BUILD_DIR}" ]; then
 	JASP_BUILD_PARENT="$(cd "${JASP_BUILD_DIR}/.." 2>/dev/null && pwd)"
