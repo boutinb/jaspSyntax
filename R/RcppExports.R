@@ -63,7 +63,7 @@ loadQmlAndParseOptions <- function(moduleName, analysisName, qmlFile, options, v
 }
 
 #' Parse options through the QML form and return the FULL bridge status in pieces:
-#' list(options = <json string>, multiDataSetJson = <json string or ""> ) -
+#' list(options = <json string>, multiDataSetJson = <json string or "">, upgradeMsgs = <json string or ""> ) -
 #' multiDataSetJson ({ ids, names }) is present for multi-dataset aware analyses and pairs
 #' with the per-dataset slices queued in the bridge (jaspBase::runJaspResults reads them via
 #' .readDataSetRequestedNative). Strings all the way through: no R-side json re-serialization.
@@ -71,6 +71,8 @@ loadQmlAndParseOptions <- function(moduleName, analysisName, qmlFile, options, v
 #' for its default filter, "title - filterName" for a saved named filter (freshly loaded
 #' datasets have only the default) - which the bridge resolves to filter ids before binding;
 #' ids themselves are not accepted there.
+#' upgradeMsgs ({ <option name, "" for the analysis>: [messages] }) is what the upgrade of options of an
+#' older `version` had to say, and which options the form does not know; they are given as R warnings too.
 loadQmlAndParseOptionsStatus <- function(moduleName, analysisName, qmlFile, options, version, preloadData) {
     .Call(`_jaspSyntax_loadQmlAndParseOptionsStatus`, moduleName, analysisName, qmlFile, options, version, preloadData)
 }

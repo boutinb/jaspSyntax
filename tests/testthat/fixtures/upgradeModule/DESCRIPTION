@@ -1,0 +1,9 @@
+Package: jaspSyntaxUpgradeModule
+Type: Package
+Title: Syntax Upgrade Module
+Version: 0.2.0
+Author: JASP Team
+Maintainer: JASP Team <info@jasp-stats.org>
+Description: Module fixture with an Upgrades.qml for jaspSyntax API tests.
+License: GPL (>= 2)
+Encoding: UTF-8

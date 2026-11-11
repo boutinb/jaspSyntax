@@ -129,7 +129,15 @@ selectable.
 \code{loadQmlAndParseOptionsStatus()} is \code{loadQmlAndParseOptions()} plus
 the full bridge status: a list with the parsed \code{options} JSON string and
 \code{multiDataSetJson} (the \code{\{ids, names, dataSetIds, primary\}} plan of
-the queued per-filter slices, "" for non-aware analyses).
+the queued per-filter slices, "" for non-aware analyses) and \code{upgradeMsgs}
+(\code{\{<option name, "" for the analysis>: [messages]\}}, "" when there are
+none).
+
+Options written for an older \code{version} of a module are upgraded by its
+\code{Upgrades.qml} before they are parsed. The messages of that upgrade, and
+the options that the form does not know and so ignores, are given as warnings
+by both \code{loadQmlAndParseOptions()} and
+\code{loadQmlAndParseOptionsStatus()}.
 
 \code{decodeJsonText()} runs the engine's send-string decoder over a whole
 JSON payload: every DataSet's own column encoder in the bridge workspace, then
