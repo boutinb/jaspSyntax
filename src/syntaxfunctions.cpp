@@ -283,6 +283,22 @@ Rcpp::IntegerVector loadDataSets(Rcpp::List datasets)
 }
 
 
+// What the Upgrades.qml of the module had to say about options of an older version, and the options the form does
+// not know: status["upgradeMsgs"] is { <option name, or "" for the analysis as a whole>: [ messages ] }.
+// They are warnings: the options were parsed, but maybe not as the caller thinks.
+static void warnUpgradeMsgs(const Json::Value & status)
+{
+	if (!status.isMember("upgradeMsgs") || !status["upgradeMsgs"].isObject())
+		return;
+
+	const Json::Value & upgradeMsgs = status["upgradeMsgs"];
+
+	for (const std::string & optionName : upgradeMsgs.getMemberNames())
+		for (const Json::Value & msg : upgradeMsgs[optionName])
+			if (msg.isString() && !msg.asString().empty())
+				Rcpp::warning("%s", ((optionName.empty() ? "" : optionName + ": ") + msg.asString()).c_str());
+}
+
 // [[Rcpp::export]]
 String loadQmlAndParseOptions(String moduleName, String analysisName, String qmlFile, String options, String version, bool preloadData)
 {
@@ -305,13 +321,15 @@ String loadQmlAndParseOptions(String moduleName, String analysisName, String qml
 		Rcpp::stop("Error when parsing options: %s", error.c_str());
 	}
 
+	warnUpgradeMsgs(status);
+
 	static std::string result;
 	result = status["options"].toStyledString();
 	return result.c_str();
 }
 
 //' Parse options through the QML form and return the FULL bridge status in pieces:
-//' list(options = <json string>, multiDataSetJson = <json string or ""> ) -
+//' list(options = <json string>, multiDataSetJson = <json string or "">, upgradeMsgs = <json string or ""> ) -
 //' multiDataSetJson ({ ids, names }) is present for multi-dataset aware analyses and pairs
 //' with the per-dataset slices queued in the bridge (jaspBase::runJaspResults reads them via
 //' .readDataSetRequestedNative). Strings all the way through: no R-side json re-serialization.
@@ -319,6 +337,8 @@ String loadQmlAndParseOptions(String moduleName, String analysisName, String qml
 //' for its default filter, "title - filterName" for a saved named filter (freshly loaded
 //' datasets have only the default) - which the bridge resolves to filter ids before binding;
 //' ids themselves are not accepted there.
+//' upgradeMsgs ({ <option name, "" for the analysis>: [messages] }) is what the upgrade of options of an
+//' older `version` had to say, and which options the form does not know; they are given as R warnings too.
 // [[Rcpp::export]]
 List loadQmlAndParseOptionsStatus(String moduleName, String analysisName, String qmlFile, String options, String version, bool preloadData)
 {
@@ -344,6 +364,10 @@ List loadQmlAndParseOptionsStatus(String moduleName, String analysisName, String
 	List result;
 	result["options"]			= status["options"].toStyledString();
 	result["multiDataSetJson"]	= status.isMember("multiDataSetJson") ? status["multiDataSetJson"].toStyledString() : std::string("");
+	result["upgradeMsgs"]		= status.isMember("upgradeMsgs") ? status["upgradeMsgs"].toStyledString() : std::string("");
+
+	warnUpgradeMsgs(status);
+
 	return result;
 }
 
