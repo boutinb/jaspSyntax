@@ -15,4 +15,3 @@
 ^src/json$
 ^tests/figs/\.gitkeep$
 ^tests/testthat/\.gitkeep$
-^tests/testthat/fixtures/minimalModule/inst/icons/\.gitkeep$
