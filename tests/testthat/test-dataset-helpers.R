@@ -874,7 +874,7 @@ test_that("readDatasetFromJaspFile dispatches through the shared bridge subproce
   expect_equal(runnerCall$input$jaspFilePath, jaspFile)
   expect_equal(runnerCall$input$dataSetIndex, 1L)
   expect_true(runnerCall$input$decode)
-  expect_true(runnerCall$input$normalize)
+  expect_false(runnerCall$input$normalize) # factors keep the level order of the file
   expect_equal(runnerCall$failureLabel, "readDatasetFromJaspFile")
 })
 

@@ -20,8 +20,11 @@ This function isolates the native jaspSyntax dataset-loading path in a short-liv
 
 Dataset materialization is delegated to \code{\link{readLoadedDataset}} so
 column-name decoding and bridge factor normalization stay behind the jaspSyntax
-dataset API. Categorical columns are returned as character vectors. Numeric
-columns are returned using the bridge's native conversion.
+dataset API. Nominal columns are returned as factors and ordinal columns as
+ordered factors, with their levels in the order of the file (the order JASP
+shows), so that \code{\link{loadDataSet}} keeps that order when the
+\code{data.frame} is loaded again. Numeric columns are returned using the
+bridge's native conversion.
 }
 \examples{
 \dontrun{
