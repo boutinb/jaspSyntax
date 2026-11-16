@@ -499,23 +499,29 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
   )
 }
 
-.readJaspAnalysisMetadata <- function(jaspFilePath) {
-  jaspFilePath <- .validateJaspFilePath(jaspFilePath)
-
-  tempDir <- tempfile("jaspSyntax_analyses_")
+.readJaspArchiveJson <- function(jaspFilePath, entry, mustExist = TRUE) {
+  tempDir <- tempfile("jaspSyntax_archive_")
   dir.create(tempDir)
   on.exit(unlink(tempDir, recursive = TRUE), add = TRUE)
 
-  utils::unzip(jaspFilePath, files = "analyses.json", exdir = tempDir)
-  analysesPath <- file.path(tempDir, "analyses.json")
-  if (!file.exists(analysesPath)) {
-    stop("Could not find `analyses.json` inside the JASP file", call. = FALSE)
+  suppressWarnings(utils::unzip(jaspFilePath, files = entry, exdir = tempDir))
+  entryPath <- file.path(tempDir, entry)
+  if (!file.exists(entryPath)) {
+    if (mustExist) {
+      stop("Could not find `", entry, "` inside the JASP file", call. = FALSE)
+    }
+    return(NULL)
   }
 
-  contents <- .fromJsonObject(
-    paste(readLines(analysesPath, warn = FALSE), collapse = "\n"),
-    "`analyses.json`"
+  .fromJsonObject(
+    paste(readLines(entryPath, warn = FALSE, encoding = "UTF-8"), collapse = "\n"),
+    paste0("`", entry, "`")
   )
+}
+
+.readJaspAnalysisMetadata <- function(jaspFilePath) {
+  jaspFilePath <- .validateJaspFilePath(jaspFilePath)
+  contents <- .readJaspArchiveJson(jaspFilePath, "analyses.json")
 
   analyses <- contents[["analyses"]]
   if (!is.list(analyses) || length(analyses) == 0L) {
@@ -525,7 +531,7 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
   analyses
 }
 
-.analysisRecordFromJaspFile <- function(metadata, options) {
+.analysisIdentityFromJaspFile <- function(metadata) {
   dynamicModule <- metadata[["dynamicModule"]]
   if (!is.list(dynamicModule)) {
     dynamicModule <- list()
@@ -547,13 +553,17 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
     moduleVersion <- .analysisValue(metadata, "version")
   }
 
-  analysis <- list(
+  list(
     name = .analysisValue(metadata, "name"),
     title = .analysisValue(metadata, "title"),
     moduleName = moduleName,
-    moduleVersion = moduleVersion,
-    options = options
+    moduleVersion = moduleVersion
   )
+}
+
+.analysisRecordFromJaspFile <- function(metadata, options) {
+  analysis <- .analysisIdentityFromJaspFile(metadata)
+  analysis$options <- options
 
   attr(analysis$options, "analysisName") <- analysis$name
   attr(analysis$options, "analysisTitle") <- analysis$title
@@ -561,19 +571,6 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
   attr(analysis$options, "moduleVersion") <- analysis$moduleVersion
 
   analysis
-}
-
-.validateFlattenTypes <- function(flattenTypes, runtime) {
-  flattenTypes <- .validateFlag(flattenTypes, "flattenTypes")
-  if (flattenTypes && runtime) {
-    stop(
-      "`flattenTypes = TRUE` only applies to the saved options (`runtime = FALSE`): ",
-      "the runtime options are already flattened by the option encoder",
-      call. = FALSE
-    )
-  }
-
-  flattenTypes
 }
 
 .validateFlag <- function(value, name) {
@@ -697,11 +694,9 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
                                                       modulePath = NULL,
                                                       runtime = FALSE,
                                                       includeMeta = TRUE,
-                                                      includeTypeOptions = TRUE,
-                                                      flattenTypes = FALSE) {
+                                                      includeTypeOptions = TRUE) {
   jaspFilePath <- .validateJaspFilePath(jaspFilePath)
   runtime <- .validateFlag(runtime, "runtime")
-  flattenTypes <- .validateFlattenTypes(flattenTypes, runtime)
   includeMeta <- .validateFlag(includeMeta, "includeMeta")
   includeTypeOptions <- .validateFlag(includeTypeOptions, "includeTypeOptions")
   analyses <- .readJaspAnalysisMetadata(jaspFilePath)
@@ -715,11 +710,7 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
 
   records <- vector("list", length(analyses))
   for (i in seq_along(analyses)) {
-    options <- if (flattenTypes) {
-      flattenedAnalysisOptionsFromJaspFile(jaspFilePath, i - 1L)
-    } else {
-      analysisOptionsFromJaspFile(jaspFilePath, i - 1L)
-    }
+    options <- analysisOptionsFromJaspFile(jaspFilePath, i - 1L)
     options <- .filterOptionMetadata(options, includeMeta = TRUE, includeTypeOptions = TRUE)
     records[[i]] <- .analysisRecordFromJaspFile(analyses[[i]], options)
 
@@ -749,8 +740,7 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
 }
 
 .runReadAnalysisOptionsSubprocess <- function(jaspFilePath, modulePath, runtime,
-                                              includeMeta, includeTypeOptions,
-                                              flattenTypes = FALSE) {
+                                              includeMeta, includeTypeOptions) {
   .runBridgeSubprocess(
     task = "read_options",
     target = ".readAnalysisOptionsFromJaspFileInProcess",
@@ -759,8 +749,7 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
       modulePath = modulePath,
       runtime = runtime,
       includeMeta = includeMeta,
-      includeTypeOptions = includeTypeOptions,
-      flattenTypes = flattenTypes
+      includeTypeOptions = includeTypeOptions
     ),
     failureLabel = "readAnalysisOptionsFromJaspFile"
   )
@@ -850,14 +839,6 @@ readDefaultAnalysisOptions <- function(modulePath, analysisName, fresh = TRUE,
 #'   options from `analyses.json`.
 #' @param includeMeta Whether to retain the `.meta` option.
 #' @param includeTypeOptions Whether to retain `*.types` options when present.
-#' @param flattenTypes Whether to split the saved `{value, types}` shape of
-#'   variables options into `<name>` (the value) and `<name>.types` (the
-#'   types), as JASP Desktop does before it calls an analysis that does not
-#'   preload its data: this runs Desktop's own walk
-#'   (`ColumnEncoder::flattenTypesInOptions`). Column names stay plain (not
-#'   encoded, no type suffix). An option with an `optionKey` and other members
-#'   besides `optionKey`/`types`/`value` keeps its saved shape, a nested option
-#'   gets its `.types` next to it. Only for `runtime = FALSE`.
 #' @param isolated Whether to run the native `.jasp` option extraction in a
 #'   separate R process. This is the default because the SyntaxInterface bridge
 #'   owns process-global native state. In-process reads also clear native state
@@ -872,13 +853,11 @@ readAnalysisOptionsFromJaspFile <- function(jaspFilePath,
                                             runtime = FALSE,
                                             includeMeta = TRUE,
                                             includeTypeOptions = TRUE,
-                                            flattenTypes = FALSE,
                                             isolated = TRUE) {
   jaspFilePath <- .validateJaspFilePath(jaspFilePath)
   runtime <- .validateFlag(runtime, "runtime")
   includeMeta <- .validateFlag(includeMeta, "includeMeta")
   includeTypeOptions <- .validateFlag(includeTypeOptions, "includeTypeOptions")
-  flattenTypes <- .validateFlattenTypes(flattenTypes, runtime)
   isolated <- .validateFlag(isolated, "isolated")
 
   if (isolated) {
@@ -896,8 +875,7 @@ readAnalysisOptionsFromJaspFile <- function(jaspFilePath,
       modulePath = modulePath,
       runtime = runtime,
       includeMeta = includeMeta,
-      includeTypeOptions = includeTypeOptions,
-      flattenTypes = flattenTypes
+      includeTypeOptions = includeTypeOptions
     ))
   }
 
@@ -906,7 +884,6 @@ readAnalysisOptionsFromJaspFile <- function(jaspFilePath,
     modulePath = modulePath,
     runtime = runtime,
     includeMeta = includeMeta,
-    includeTypeOptions = includeTypeOptions,
-    flattenTypes = flattenTypes
+    includeTypeOptions = includeTypeOptions
   )
 }

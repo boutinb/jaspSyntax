@@ -392,13 +392,16 @@ loadAnalysisDataset <- function(dataset, modulePath, analysisName, options = NUL
   )
 }
 
+# Nominal and ordinal columns stay the factors the bridge gives (ordered for ordinal ones), with their levels in the
+# order of the file: as characters they would lose it, and loadDataSet() would order them alphabetically, which
+# changes e.g. the reference level of a contrast.
 readDatasetFromJaspFile <- function(jaspFilePath, dataSetIndex = 1L) {
   args <- .validateReadDatasetFromJaspFileArgs(jaspFilePath, dataSetIndex)
   dataset <- .runReadDatasetSubprocess(
     args$jaspFilePath,
     args$dataSetIndex,
     decode = TRUE,
-    normalize = TRUE
+    normalize = FALSE
   )
   .attachJaspDatasetSource(dataset, args$jaspFilePath, args$dataSetIndex)
 }
