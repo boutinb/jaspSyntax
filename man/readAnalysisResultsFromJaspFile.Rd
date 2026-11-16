@@ -30,8 +30,8 @@ not to a plot object, so plots cannot be compared with \pkg{vdiffr} against
 these results.
 
 The results are returned as stored. When JASP Desktop loads an older archive
-it also sweeps its results for legacy \code{JaspColumn_<i>_Encoded} tokens;
-this reader does not.
+it also decodes the column names that its results may still have in their old
+encoded form; this reader does not.
 }
 \seealso{
 \code{\link{readAnalysisOptionsFromJaspFile}},

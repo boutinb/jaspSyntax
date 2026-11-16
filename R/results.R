@@ -4,9 +4,9 @@
 #' the same results tree the analysis sent to Desktop (tables with their
 #' schema and raw, unformatted cell values, plots, collections, notes).
 #' Desktop stores them decoded, so column names are the user's. The results are
-#' returned as stored: Desktop also sweeps the results of older archives for
-#' legacy `JaspColumn_<i>_Encoded` tokens when it loads them, which this reader
-#' does not do.
+#' returned as stored: Desktop also decodes the column names that the results
+#' of older archives may still have in their old encoded form when it loads
+#' them, which this reader does not do.
 #'
 #' @param jaspFilePath Path to a `.jasp` file.
 #'
