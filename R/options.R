@@ -300,6 +300,11 @@ resolveAnalysisQml <- function(modulePath, analysisName) {
 #' option metadata is applied, and column-name/type encoding is handled by the
 #' native `ColumnEncoder`.
 #'
+#' No analysis run is prepared: a dataset selection option of a multi-dataset
+#' form (e.g. `dataSetA`) that names no dataset stays empty instead of failing,
+#' so the defaults of such a form can be read without loading a dataset. A
+#' dataset selection that is given must name a loaded dataset.
+#'
 #' @param qmlFile Path to an analysis QML file.
 #' @param options Named list of options, a JSON object string, or `NULL` for
 #'   defaults.
@@ -371,7 +376,8 @@ parseQmlOptions <- function(qmlFile, options = NULL, moduleName = "jaspModule",
     clearQmlForms()
   }
 
-  rawOptions <- loadQmlAndParseOptions(
+  # No run follows: a dataset selection option may stay empty (no dataset needs to be loaded for the defaults)
+  rawOptions <- loadQmlAndParseFormOptions(
     moduleName = moduleName,
     analysisName = analysisName,
     qmlFile = qmlFile,
@@ -384,7 +390,7 @@ parseQmlOptions <- function(qmlFile, options = NULL, moduleName = "jaspModule",
     return(rawOptions)
   }
 
-  parsedOptions <- .fromJsonObject(rawOptions, "jaspSyntax::loadQmlAndParseOptions()")
+  parsedOptions <- .fromJsonObject(rawOptions, "jaspSyntax::parseQmlOptions()")
   .filterOptionMetadata(parsedOptions, includeMeta, includeTypeOptions)
 }
 
